@@ -2,7 +2,7 @@
 
 Gra strategiczna na telefon dla dwóch osób. Jeden gracz jest **patogenem**, drugi **obrońcą** ludzkości. Każdy gra na swoim telefonie, w przeglądarce, przez internet.
 
-Prototyp: czysty HTML/CSS/JS, bez budowania i bez własnego serwera.
+Prototyp: czysty HTML/CSS/JS, bez budowania, bez zależności i bez własnego serwera.
 
 ## Zasady w skrócie
 
@@ -19,7 +19,7 @@ Prototyp: czysty HTML/CSS/JS, bez budowania i bez własnego serwera.
 
 Telefon twórcy gry prowadzi symulację, więc nie może zamknąć strony. Gdy któryś telefon zgaśnie lub straci sieć, gra się wstrzymuje, a po powrocie rusza dalej.
 
-Połączenie to WebRTC (biblioteka PeerJS w `vendor/`, publiczny serwer pośredniczący PeerJS tylko do zestawienia połączenia). W niektórych sieciach komórkowych bezpośrednie połączenie może się nie udać – wtedy pomaga Wi-Fi.
+Telefony nie łączą się ze sobą bezpośrednio. Każdy łączy się z publicznym przekaźnikiem wiadomości (MQTT po WebSocket), więc gra działa w dowolnej sieci: Wi-Fi i dane komórkowe, każdy u siebie. Używane są trzy darmowe przekaźniki naraz (EMQX, HiveMQ, Mosquitto); wystarczy, że działa jeden. To cudze serwery bez gwarancji, a kto zna kod pokoju, może podejrzeć partię. Żadne dane osobowe tamtędy nie idą.
 
 ## Uruchomienie lokalne
 
@@ -29,6 +29,7 @@ python3 -m http.server 8000
 
 - `http://localhost:8000/` – normalna gra.
 - `http://localhost:8000/?local=1` – tryb testowy: dwie karty tej samej przeglądarki łączą się bez internetu.
+- `?broker=ws://host:port` – własny przekaźnik MQTT zamiast publicznych (kilka adresów po przecinku).
 - **Trening z botem** działa zawsze, bez sieci.
 
 ## Balans
