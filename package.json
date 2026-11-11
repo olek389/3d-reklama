@@ -1,0 +1,6 @@
+{
+  "name": "ognisko",
+  "private": true,
+  "type": "module",
+  "scripts": { "sim": "node tools/sim.mjs" }
+}
