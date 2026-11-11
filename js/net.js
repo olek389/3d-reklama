@@ -46,7 +46,7 @@ function packet(type, body) {
 
 // Jeden przekaźnik: łączy się, subskrybuje temat i sam wznawia połączenie po zerwaniu.
 function broker(url, subTopic, onPayload, onState) {
-  let ws = null, up = false, closed = false, buf = new Uint8Array(0), ping = null, retry = null;
+  let ws = null, up = false, closed = false, buf = new Uint8Array(0), ping = null, retry = null, lastRx = 0;
 
   const open = () => {
     if (closed) return;
@@ -54,19 +54,22 @@ function broker(url, subTopic, onPayload, onState) {
     ws.binaryType = 'arraybuffer';
     ws.onopen = () => ws.send(packet(0x10, [...str('MQTT'), 4, 2, 0, 30, ...str('ogn' + randomId())]));
     ws.onmessage = (e) => {
+      lastRx = Date.now();
       const add = new Uint8Array(e.data);
       const merged = new Uint8Array(buf.length + add.length);
       merged.set(buf); merged.set(add, buf.length);
       buf = merged;
       parse();
     };
+    const sock = ws;
     ws.onclose = () => {
+      if (sock !== ws) return; // stare gniazdo, już zastąpione
       clearInterval(ping);
       if (up) { up = false; onState(); }
       buf = new Uint8Array(0);
       if (!closed) retry = setTimeout(open, 2500);
     };
-    ws.onerror = () => { try { ws.close(); } catch { /* już zamknięty */ } };
+    ws.onerror = () => { try { sock.close(); } catch { /* już zamknięty */ } };
   };
 
   const parse = () => {
@@ -101,12 +104,21 @@ function broker(url, subTopic, onPayload, onState) {
       body.set(head); body.set(payload, head.length);
       ws.send(packet(0x30, body));
     },
+    // Po powrocie strony z tła: sprawdź, czy połączenie żyje, a jeśli nie – połącz od razu.
+    kick() {
+      if (closed) return;
+      if (!ws || ws.readyState > 1) { clearTimeout(retry); open(); return; }
+      if (ws.readyState !== 1) return;
+      const t = Date.now(), sock = ws;
+      try { sock.send(packet(0xC0, [])); } catch { /* nic */ }
+      setTimeout(() => { if (lastRx < t && sock === ws) { try { sock.close(); } catch { /* nic */ } clearTimeout(retry); if (up) { up = false; onState(); } open(); } }, 3000);
+    },
     close() { closed = true; clearTimeout(retry); clearInterval(ping); try { ws.close(); } catch { /* nic */ } },
   };
 }
 
 // Kanał na wszystkich przekaźnikach naraz, z numeracją wiadomości i odrzucaniem duplikatów.
-function channel(code, side, onData) {
+function channel(code, side, onData, onStatus) {
   const me = randomId();
   const pubTopic = TOPIC + code + (side === 'host' ? '/h2g' : '/g2h');
   const subTopic = TOPIC + code + (side === 'host' ? '/g2h' : '/h2g');
@@ -117,7 +129,13 @@ function channel(code, side, onData) {
     if (seen[m.id] >= m.s) return;
     seen[m.id] = m.s;
     onData(m.id, m.d, m.to);
-  }, () => { if (onReady && list.some((b) => b.up)) { onReady(); onReady = null; } }));
+  }, () => {
+    if (onStatus) onStatus(list.filter((b) => b.up).length, list.length);
+    if (onReady && list.some((b) => b.up)) { onReady(); onReady = null; }
+  }));
+  const wake = () => { if (document.visibilityState === 'visible') for (const b of list) b.kick(); };
+  document.addEventListener('visibilitychange', wake);
+  addEventListener('online', wake);
   return {
     me,
     ready: (ms) => new Promise((resolve, reject) => {
@@ -126,13 +144,13 @@ function channel(code, side, onData) {
       onReady = () => { clearTimeout(t); resolve(); };
     }),
     send(d, to) { const m = { id: me, s: ++seq, d, to }; for (const b of list) b.publish(pubTopic, m); },
-    close() { for (const b of list) b.close(); },
+    close() { document.removeEventListener('visibilitychange', wake); removeEventListener('online', wake); for (const b of list) b.close(); },
   };
 }
 
 const NO_NET = 'Brak połączenia z serwerem gry. Sprawdź internet i spróbuj ponownie.';
 
-async function hostRelay(code, onGuest, onError) {
+async function hostRelay(code, onGuest, onError, onStatus) {
   let guestId = null, cur = null;
   const ch = channel(code, 'host', (from, d) => {
     if (d && d.sys === 'open') {
@@ -146,30 +164,30 @@ async function hostRelay(code, onGuest, onError) {
       return;
     }
     if (from === guestId && cur && cur.onMessage) cur.onMessage(d);
-  });
+  }, onStatus);
   try { await ch.ready(12000); } catch { ch.close(); onError(NO_NET); return { close() {} }; }
   return { close: () => ch.close() };
 }
 
-async function joinRelay(code, onError) {
+async function joinRelay(code, onError, onStatus) {
   const l = link();
   let hostId = null, acked = null;
   const ch = channel(code, 'guest', (from, d, to) => {
     if (to && to !== ch.me) return; // wiadomość dla poprzedniego gościa
     if (d && d.sys === 'ack') { hostId = from; if (acked) acked(); return; }
     if (from === hostId && l.onMessage) l.onMessage(d);
-  });
+  }, onStatus);
   l.send = (o) => ch.send(o);
   l.close = () => ch.close();
   try { await ch.ready(12000); } catch { ch.close(); onError(NO_NET); return new Promise(() => {}); }
-  // pukaj co sekundę, aż gospodarz odpowie
-  const ok = await new Promise((resolve) => {
+  // Pukaj co sekundę, aż gospodarz odpowie. Nie poddawaj się: telefon gospodarza mógł
+  // uśpić stronę (np. gdy wysyła kod w komunikatorze) i odpowie dopiero po powrocie.
+  await new Promise((resolve) => {
     let tries = 0;
-    const knock = setInterval(() => { if (++tries > 15) { clearInterval(knock); resolve(false); } else ch.send({ sys: 'open' }); }, 1000);
-    acked = () => { clearInterval(knock); acked = null; resolve(true); };
+    const knock = setInterval(() => { ch.send({ sys: 'open' }); if (++tries === 8 && onStatus) onStatus(-1); }, 1000);
+    acked = () => { clearInterval(knock); acked = null; resolve(); };
     ch.send({ sys: 'open' });
   });
-  if (!ok) { ch.close(); onError('Nie znaleziono gry o tym kodzie. Sprawdź kod i czy przeciwnik ma otwartą stronę z kodem.'); return new Promise(() => {}); }
   return l;
 }
 
@@ -200,5 +218,5 @@ function joinLocal(code) {
   return Promise.resolve(l);
 }
 
-export const hostRoom = (code, onGuest, onError) => (LOCAL ? hostLocal(code, onGuest) : hostRelay(code, onGuest, onError));
-export const joinRoom = (code, onError) => (LOCAL ? joinLocal(code) : joinRelay(code, onError));
+export const hostRoom = (code, onGuest, onError, onStatus) => (LOCAL ? hostLocal(code, onGuest) : hostRelay(code, onGuest, onError, onStatus));
+export const joinRoom = (code, onError, onStatus) => (LOCAL ? joinLocal(code) : joinRelay(code, onError, onStatus));

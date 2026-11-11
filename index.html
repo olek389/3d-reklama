@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <title>OGNISKO – pandemia 1 na 1</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=3">
 </head>
 <body>
   <!-- EKRAN STARTOWY -->
@@ -54,6 +54,7 @@
         <p>Im groźniejsze objawy, tym szybciej świat zauważy chorobę i tym szybciej idą badania.</p>
       </details>
       <p id="homeErr" class="err"></p>
+      <p class="hint" style="text-align:center">wersja 3</p>
     </div>
   </section>
 
@@ -63,6 +64,7 @@
       <p class="hint">Kod gry</p>
       <div id="lobbyCode" class="code">····</div>
       <p id="lobbyMsg" class="sub">Łączenie…</p>
+      <p id="lobbyNet" class="hint"></p>
       <button class="btn primary hidden" id="btnShare">Wyślij zaproszenie</button>
       <button class="btn" id="btnCancel">Anuluj</button>
     </div>
@@ -122,6 +124,6 @@
     <div id="overlay" class="overlay hidden"><div class="overlay-box" id="overlayBox"></div></div>
   </section>
 
-  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/main.js?v=3"></script>
 </body>
 </html>

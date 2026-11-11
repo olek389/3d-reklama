@@ -31,6 +31,10 @@ $('btnCancel').onclick = () => { if (room) room.close(); location.href = locatio
 const joinParam = new URLSearchParams(location.search).get('join');
 if (joinParam) { $('codeInput').value = joinParam.toUpperCase().slice(0, 4); join(joinParam); }
 
+function netStatus(up, total) {
+  $('lobbyNet').textContent = `Serwery gry: ${up}/${total} połączone`;
+}
+
 function fail(msg) {
   show('home');
   $('homeErr').textContent = msg;
@@ -55,8 +59,8 @@ async function createRoom() {
   room = await hostRoom(code, (guest) => {
     if (host) host.attach(guest); // powrót po rozłączeniu
     else host = runHost({ role, guest, code });
-  }, (msg) => { if (!host) fail(msg); });
-  $('lobbyMsg').textContent = `Grasz jako: ${ROLE_NAME[role]}. Podaj ten kod przeciwnikowi i nie zamykaj tej strony.`;
+  }, (msg) => { if (!host) fail(msg); }, netStatus);
+  $('lobbyMsg').textContent = `Grasz jako: ${ROLE_NAME[role]}. Podaj ten kod przeciwnikowi, a potem wróć na tę stronę i zostaw ją otwartą. Gra ruszy, gdy przeciwnik dołączy.`;
   const url = `${location.origin}${location.pathname}?join=${code}`;
   const share = $('btnShare');
   share.classList.remove('hidden');
@@ -135,7 +139,10 @@ async function join(raw) {
   $('lobbyMsg').textContent = 'Łączenie z przeciwnikiem…';
   $('btnShare').classList.add('hidden');
   let started = false, over = false, lastView = Date.now();
-  const link = await joinRoom(code, (msg) => { if (!started) fail(msg); });
+  const link = await joinRoom(code, (msg) => { if (!started) fail(msg); }, (up, total) => {
+    if (up === -1) $('lobbyMsg').textContent = 'Nie widzę jeszcze gry o tym kodzie. Sprawdź kod i poproś przeciwnika, żeby wrócił na stronę z kodem. Czekam dalej…';
+    else netStatus(up, total);
+  });
 
   link.onMessage = (m) => {
     if (m.t === 'welcome') {
