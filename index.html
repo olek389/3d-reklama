@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0b1118">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <title>OGNISKO – pandemia 1 na 1</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- EKRAN STARTOWY -->
+  <section id="home" class="screen">
+    <div class="home-inner">
+      <div class="logo">
+        <svg viewBox="0 0 64 64" width="72" height="72" aria-hidden="true">
+          <circle cx="32" cy="32" r="29" fill="none" stroke="#e5484d" stroke-width="2" opacity=".35"/>
+          <circle cx="32" cy="32" r="19" fill="none" stroke="#e5484d" stroke-width="2" opacity=".6"/>
+          <circle cx="32" cy="32" r="8" fill="#e5484d"/>
+        </svg>
+        <h1>OGNISKO</h1>
+        <p class="sub">Pandemia 1 na 1. Jeden gracz jest patogenem, drugi broni ludzkości.</p>
+      </div>
+
+      <div class="card">
+        <h2>Nowa gra</h2>
+        <p class="hint">Wybierz swoją stronę:</p>
+        <div class="role-pick" id="rolePick">
+          <button class="role virus sel" data-role="virus"><b>Patogen</b><span>Zaraź i zniszcz 60% ludzkości</span></button>
+          <button class="role def" data-role="def"><b>Obrońca</b><span>Opracuj lek, zanim będzie za późno</span></button>
+        </div>
+        <button class="btn primary" id="btnCreate">Utwórz grę i zaproś przeciwnika</button>
+        <button class="btn" id="btnBot">Trening z botem</button>
+      </div>
+
+      <div class="card">
+        <h2>Dołącz do gry</h2>
+        <p class="hint">Wpisz kod od przeciwnika:</p>
+        <div class="join-row">
+          <input id="codeInput" maxlength="4" placeholder="KOD" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text">
+          <button class="btn primary" id="btnJoin">Dołącz</button>
+        </div>
+      </div>
+
+      <details class="card how">
+        <summary>Jak grać</summary>
+        <p><b>Patogen</b> wybiera region startowy i rozwija się w trzech drzewkach: Przenoszenie, Objawy, Zdolności. Punkty DNA zdobywa za nowe zakażenia, nowe regiony i zgony. Wygrywa, gdy zabije 60% ludzkości.</p>
+        <p><b>Obrońca</b> ma trzy własne drzewka: Medycyna, Kontrola, Wywiad. Może zamykać lotniska, porty i granice oraz wprowadzać kwarantanny, ale każde ograniczenie kosztuje zaufanie społeczne. Wygrywa, gdy ukończy lek, gdy patogen wygaśnie albo gdy minie czas (12,5 minuty).</p>
+        <p><b>Mgła wojny:</b> obrońca widzi tylko wykryte ogniska i nie zna cech patogenu, dopóki ich nie zbada. Patogen zna postęp prac nad lekiem tylko w przybliżeniu.</p>
+        <p>Im groźniejsze objawy, tym szybciej świat zauważy chorobę i tym szybciej idą badania.</p>
+      </details>
+      <p id="homeErr" class="err"></p>
+    </div>
+  </section>
+
+  <!-- POCZEKALNIA -->
+  <section id="lobby" class="screen hidden">
+    <div class="home-inner center">
+      <p class="hint">Kod gry</p>
+      <div id="lobbyCode" class="code">····</div>
+      <p id="lobbyMsg" class="sub">Łączenie…</p>
+      <button class="btn primary hidden" id="btnShare">Wyślij zaproszenie</button>
+      <button class="btn" id="btnCancel">Anuluj</button>
+    </div>
+  </section>
+
+  <!-- GRA -->
+  <section id="game" class="screen hidden">
+    <header id="hud">
+      <div class="hud-row">
+        <span id="hudRole" class="badge"></span>
+        <span id="hudDay" class="mono"></span>
+        <span id="hudTime" class="mono dim"></span>
+        <span class="grow"></span>
+        <span id="hudTrust" class="pill hidden"></span>
+        <span id="hudMoney" class="pill money"></span>
+      </div>
+      <div class="bars">
+        <div class="bar"><label>Zakażeni</label><div class="track"><i id="barInf" class="fill inf"></i></div><span id="valInf" class="mono"></span></div>
+        <div class="bar"><label>Zgony</label><div class="track"><i id="barDead" class="fill dead"></i><b class="goal" id="goalMark"></b></div><span id="valDead" class="mono"></span></div>
+        <div class="bar"><label>Lek</label><div class="track"><i id="barCure" class="fill cure"></i></div><span id="valCure" class="mono"></span></div>
+      </div>
+    </header>
+
+    <div id="banner" class="banner hidden"></div>
+
+    <main id="panels">
+      <div id="p-map" class="panel">
+        <div id="mapwrap"><svg id="map" viewBox="0 0 1000 520" preserveAspectRatio="xMidYMid meet"></svg></div>
+        <div id="legend">
+          <span><i class="dot inf"></i>zakażeni</span><span><i class="dot dead"></i>zgony</span>
+          <span><i class="ln land"></i>ląd</span><span><i class="ln air"></i>samolot</span><span><i class="ln sea"></i>statek</span>
+        </div>
+        <div id="ticker"></div>
+      </div>
+      <div id="p-up" class="panel hidden">
+        <div id="treeTabs" class="subtabs"></div>
+        <div id="upList" class="list"></div>
+      </div>
+      <div id="p-rep" class="panel hidden"><div id="report" class="list"></div></div>
+    </main>
+
+    <div id="sheet" class="sheet hidden">
+      <div class="sheet-head"><h3 id="shName"></h3><button id="shClose" class="x" aria-label="Zamknij">✕</button></div>
+      <p id="shMeta" class="dim small"></p>
+      <div id="shStats" class="stats"></div>
+      <p id="shLinks" class="dim small"></p>
+      <div id="shActs" class="acts"></div>
+    </div>
+
+    <nav id="tabs">
+      <button data-tab="map" class="sel">Mapa</button>
+      <button data-tab="up" id="tabUp">Rozwój</button>
+      <button data-tab="rep">Raport</button>
+    </nav>
+
+    <div id="toast" class="toast hidden"></div>
+    <div id="overlay" class="overlay hidden"><div class="overlay-box" id="overlayBox"></div></div>
+  </section>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
